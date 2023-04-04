@@ -31,7 +31,7 @@ func main() {
 	//Defining the endpoint
 	r.GET("/order/:id", readOrderHandler)
 	r.POST("/order", createOrderHandler)
-	r.PUT("/ordersort", sortOrderHandler)
+	r.POST("/ordersort", sortOrderHandler)
 	r.PUT("/order", updateOrderHandler)
 	r.DELETE("/order/:id", deleteOrderHandler)
 
@@ -98,13 +98,13 @@ func readOrderHandler(c *gin.Context) {
 
 func createOrderHandler(c *gin.Context) {
 
-	//Create postgres connection
+	// Create postgres connection
 	db, err := sql.Open("postgres", psqlInfo)
 	if err != nil {
 		log.Println(err)
 	}
 
-	//Close postgres connection before exiting function
+	// Close postgres connection before exiting function
 	defer db.Close()
 
 	// Getting data from POST request body
@@ -118,23 +118,35 @@ func createOrderHandler(c *gin.Context) {
 		return
 	}
 
-	//Adding row to the table orderitems containing foreign key
-	_, err = db.Exec("Insert into orderitems (id,description,price,quantity) VALUES ($1,$2,$3,$4)", one.Items.Id, one.Items.Desc, one.Items.Price, one.Items.Qty)
+	// Check if there is data in orderitems table with specified id
+	var count int
+	err = db.QueryRow("SELECT count(*) FROM orderitems WHERE id=$1", one.Items.Id).Scan(&count)
 	if err != nil {
 		log.Println(err)
-		c.JSON(500, "Error in addition in table 2!")
+		c.JSON(500, "Error checking orderitems table!")
+		return
+	}
+	fmt.Println(count)
+
+	// Add row to the table orderitems containing foreign key if there is no data
+	if count == 0 {
+		_, err = db.Exec("INSERT INTO orderitems(id, description, price, quantity) VALUES ($1, $2, $3, $4)", one.Items.Id, one.Items.Desc, one.Items.Price, one.Items.Qty)
+		if err != nil {
+			log.Println(err)
+			c.JSON(500, "Error adding to orderitems table!")
+			return
+		}
+	}
+
+	// Add row to the table orders
+	_, err = db.Exec("INSERT INTO orders(id, status, item_id, total, currency_unit) VALUES ($1, $2, $3, $4, $5)", one.Id, one.Status, one.Items.Id, one.Total, one.CurrencyUnit)
+	if err != nil {
+		log.Println(err)
+		c.JSON(500, "Error adding to orders table!")
 		return
 	}
 
-	//Adding row to the table orders
-	_, err = db.Exec("Insert into orders (id,status,item_id,total,currency_unit) VALUES ($1,$2,$3,$4,$5)", one.Id, one.Status, one.Items.Id, one.Total, one.CurrencyUnit)
-	if err != nil {
-		log.Println(err)
-		c.JSON(500, "Error in addition in table 1!")
-		return
-	}
-
-	//Output row ID
+	// Output row ID
 	c.JSON(200, fmt.Sprintf("Added = %v", one.Id))
 }
 
@@ -152,33 +164,50 @@ func sortOrderHandler(c *gin.Context) {
 	//Close postgres connection before exiting function
 	defer db.Close()
 
-	// Getting data from PUT request body
+	// Getting data from POST request body
 	decoder := json.NewDecoder(c.Request.Body)
 
 	type SortOrder struct {
-		ColumnName string
-		OrderBy    string
-		Condition  string
+		FilterColumn  string
+		FilterValue   interface{}
+		SortingColumn string
+		OrderBy       string
 	}
 
 	var one SortOrder
 	var query string
 
-	//Getting column name and order
+	//Getting condition, column name and order from JSON body
 	err = decoder.Decode(&one)
 	if err != nil {
 		log.Println(err)
+		c.JSON(500, "Rows do not exist!!!!")
 		return
 	}
 
-	//Check if a condition is provided to filter the order table
-	if one.Condition != "" {
-		query = fmt.Sprintf("SELECT o.id, o.status, o.item_id, oi.description, oi.price, oi.quantity, o.total, o.currency_unit FROM orders o INNER JOIN orderitems oi on o.item_id=oi.id WHERE %s ORDER BY %s %s", one.Condition, one.ColumnName, one.OrderBy)
-	} else {
-		query = fmt.Sprintf("SELECT o.id, o.status, o.item_id, oi.description, oi.price, oi.quantity, o.total, o.currency_unit FROM orders o INNER JOIN orderitems oi on o.item_id=oi.id ORDER BY %s %s", one.ColumnName, one.OrderBy)
+	if one.OrderBy == "" {
+		one.OrderBy = "ASC"
+	}
+	if one.SortingColumn == "" {
+		one.SortingColumn = "o.id"
 	}
 
-	rows, _ := db.Query(query)
+	//Check if a condition is provided to filter the order table
+	if one.FilterColumn != "" {
+		//query with filter and sort function
+		query = fmt.Sprintf("SELECT o.id, o.status, o.item_id, oi.description, oi.price, oi.quantity, o.total, o.currency_unit FROM orders o INNER JOIN orderitems oi on o.item_id=oi.id WHERE %s = '%v' ORDER BY %s %s", one.FilterColumn, one.FilterValue, one.SortingColumn, one.OrderBy)
+	} else {
+		//query with sort function
+		query = fmt.Sprintf("SELECT o.id, o.status, o.item_id, oi.description, oi.price, oi.quantity, o.total, o.currency_unit FROM orders o INNER JOIN orderitems oi on o.item_id=oi.id ORDER BY %s %s", one.SortingColumn, one.OrderBy)
+	}
+
+	fmt.Println(query)
+	rows, err := db.Query(query)
+	if err != nil {
+		log.Println(err)
+		c.JSON(500, "Rows do not exist!")
+		return
+	}
 	var orders []Order
 
 	for rows.Next() {
@@ -189,7 +218,7 @@ func sortOrderHandler(c *gin.Context) {
 
 		if err != nil {
 			log.Println(err)
-			c.JSON(500, "Rows do not exist")
+			c.JSON(500, "Rows do not exist!!")
 			return
 		}
 
@@ -235,12 +264,12 @@ func updateOrderHandler(c *gin.Context) {
 
 	if err != nil {
 		log.Println(err)
-		c.JSON(500, "Error in updation in table!")
+		c.JSON(500, gin.H{"error": "Error in updation in table!"})
 		return
 	}
 
 	//Output row ID
-	c.JSON(200, fmt.Sprintf("Updated = %v ", one.Id))
+	c.JSON(200, gin.H{"message": fmt.Sprintf("Updated = %v", one.Id)})
 
 }
 
@@ -264,11 +293,10 @@ func deleteOrderHandler(c *gin.Context) {
 	_, err = db.Exec("Delete from orders where id = $1", deleteId)
 	if err != nil {
 		log.Println(err)
-		c.JSON(500, "Error in deletion from table!")
+		c.JSON(500, gin.H{"message": "Error in deletion from table!"})
 		return
 	}
 
 	//Output row ID
-	c.JSON(200, fmt.Sprintf("Deleted = %v ", deleteId))
-
+	c.JSON(200, gin.H{"message": fmt.Sprintf("Deleted = %v", deleteId)})
 }
