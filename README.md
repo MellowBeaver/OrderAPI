@@ -4,17 +4,17 @@ This is a simple API to demonstrate CRUD operations along with sort and filter f
 
 # Usecases
 
-This API has 6 usecases:
+This API has 6 use cases:
 1. Create
 2. Read
 3. Update
-4. Sort - takes column name from orders table and ASC/DESC.
-5. Filter - takes condition, column name from orders table and ASC/DESC.
+4. Sort - takes column name from orders and sorts by ASC/DESC.
+5. Filter - takes condition, column name from orders and sorts by ASC/DESC.
 6. Delete
 
 ## Create
 
-- URL: `localhost:8000/order`
+- POST `/order`
 - Example:
   - Input: JSON 
   ```
@@ -35,10 +35,10 @@ This API has 6 usecases:
 
 ## Read 
 
-- URL: `localhost:8000/order/[id]`
+- GET `/order/[id]`
 - Here we pass the id from Order table.
 - Example:
-  - URL: `localhost:8000/order/abcdef-123456`
+  - GET `/order/abcdef-123456`
   - Output:
   ```
   {
@@ -57,29 +57,31 @@ This API has 6 usecases:
 
 ## Update
 
-- URL: localhost:8000/order
-- Example:
-  - Input: JSON
-  ```
-    {
-      "id":"abcdef-123456",
-      "status":"DONE"
-    }
-  ```
-  - Output:
-  ```
-  "Updated = abcdef-123456 "
-  ```
-
-## Sort
-
-- URL: `localhost:8000/ordersort`
-- Here, we pass column name (id/status/item_id/total/currency_unit from the orders table) and the order type (ASC/DESC).
+- POST `/order`
 - Example:
   - Input: JSON
   ```
   {
-    "columnname":"total",
+    "id":"abcdef-123456",
+    "status":"DONE"
+  }
+  ```
+  - Output:
+  ```
+  {
+    "message": "Updated = abcdef-123456 "
+  }
+  ```
+
+## Sort
+
+- POST `/ordersort`
+- Here, we pass column name (o.id/status/item_id/total/currency_unit from the orders table) and the order type (ASC/DESC).
+- Example:
+  - Input: JSON
+  ```
+  {
+    "sortingcolumn": "total",
     "orderby":"ASC"
   }
   ```
@@ -125,32 +127,49 @@ This API has 6 usecases:
   ]
   ```
 ## Filter
-- URL: `localhost:8000/ordersort`
-- Here, we pass column name (id/status/item_id/total/currency_unit from the orders table) and the order type (ASC/DESC).
+- POST `/ordersort`
+- Here, we pass filter column name (o.id/status/item_id/total/currency_unit from the orders table) and filter value.
 - Example:
   - Input: JSON
   ```
   {
-    "condition": "status='DONE'",
-    "columnname":"total",
-    "orderby":"ASC"
+    "filtercolumn":"currency_unit",
+    "filtervalue":"INR"
   }
   ```
   - Output:
   ```
   [
     {
-        "id": "abcdef-123456",
-        "status": "DONE",
+        "id": "abc-123",
+        "status": "PENDING_INVOICE",
         "items": {
-            "id": 123456,
-            "description": "a product description",
-            "price": 12.4,
-            "quantity": 1
+            "id": 125,
+            "description": "z products ",
+            "price": 32,
+            "quantity": 3
         },
-        "total": 12.4,
-        "currencyUnit": "USD"
-    },
+        "total": 96,
+        "currencyUnit": "INR"
+    }
+  ]
+  ```
+## Sort and Filter
+- POST `/ordersort`
+- Here, we pass filter column name (o.id/status/item_id/total/currency_unit from the orders table) and filter value alone with sorting column name (o.id/status/item_id/total/currency_unit from the orders table) and orderby (ASC/DESC).
+- Example:
+  - Input: JSON
+  ```
+  {
+    "filtercolumn":"status",
+    "filtervalue":"DONE",
+    "sortingcolumn": "total",
+    "orderby":"DESC"
+  }
+  ```
+  - Output:
+  ```
+  [
     {
         "id": "ab-1",
         "status": "DONE",
@@ -162,10 +181,33 @@ This API has 6 usecases:
         },
         "total": 32,
         "currencyUnit": "HKD"
+    },
+    {
+        "id": "abcdef-123456",
+        "status": "DONE",
+        "items": {
+            "id": 123456,
+            "description": "a product description",
+            "price": 12.4,
+            "quantity": 1
+        },
+        "total": 12.4,
+        "currencyUnit": "USD"
     }
   ]
   ```
-  
+## Delete
+- DELETE `/order/[id]`
+- Here we pass the id from Order table.
+- Example:
+  - DELETE `/order/ab-1`
+  - Output:
+  ```
+  {
+    "message": "Deleted = ab-1"
+  }
+  ```
+
 # Steps to run the API
 
 ## Steps to run DB using Docker
