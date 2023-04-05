@@ -215,8 +215,7 @@ This API has 6 use cases:
 ## Steps to run DB using Docker
 
 - Install docker on system.
-- Run `docker compose up`.
-- Run `docker ps to check if container is running`.
+- Run `docker run --name orderApp -p 5432:5432 -e POSTGRES_USER=[username] -e POSTGRES_PASSWORD=[password] -d postgres`
 
 ## Steps to connect to DB container
 
