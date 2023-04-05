@@ -255,4 +255,3 @@ create table orders (
 
 - Run `go test -run main_test.go`
 
-EOP
