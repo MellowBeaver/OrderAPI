@@ -254,3 +254,5 @@ create table orders (
 ## Steps to run the test file
 
 - Run `go test -run main_test.go`
+
+EOP
