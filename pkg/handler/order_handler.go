@@ -1,66 +1,22 @@
-package main
-
-//Using postgresSQL and Go lang APIs for basic CRUD operations.
+package handler
 
 import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
 	"log"
+	"net/http"
+	"orderapp/pkg/constant"
+	"orderapp/pkg/model"
 
 	"github.com/gin-gonic/gin"
-	_ "github.com/go-sql-driver/mysql"
-	_ "github.com/lib/pq"
 )
 
-// Update the postgres Database
-const (
-	user     = "postgres"
-	host     = "localhost"
-	dbname   = "postgres"
-	password = "system"
-	port     = 5432
-)
-
-var psqlInfo string = fmt.Sprintf("host=%s port=%d user=%s "+"password=%s dbname=%s sslmode=disable", host, port, user, password, dbname)
-
-func main() {
-
-	r := gin.Default()
-
-	//Defining the endpoint
-	r.GET("/order/:id", readOrderHandler)
-	r.POST("/order", createOrderHandler)
-	r.POST("/ordersort", sortOrderHandler)
-	r.PUT("/order", updateOrderHandler)
-	r.DELETE("/order/:id", deleteOrderHandler)
-
-	//Starting GIN server at port 8000
-	r.Run(":8000")
-}
-
-//Creating Order Item struct
-
-type OrderItem struct {
-	Id    int     `json:"id"`
-	Desc  string  `json:"description"`
-	Price float32 `json:"price"`
-	Qty   int     `json:"quantity"`
-}
-
-//Creating Order struct
-
-type Order struct {
-	Id           string    `json:"id"`
-	Status       string    `json:"status"`
-	Items        OrderItem `json:"items"`
-	Total        float32   `json:"total"`
-	CurrencyUnit string    `json:"currencyUnit"`
-}
+var psqlInfo string = fmt.Sprintf("host=%s port=%d user=%s "+"password=%s dbname=%s sslmode=disable", constant.Host, constant.Port, constant.User, constant.Password, constant.Dbname)
 
 //This function fetches data based on id value present in orders table
 
-func readOrderHandler(c *gin.Context) {
+func ReadOrderHandler(c *gin.Context) {
 
 	//Create postgres connection
 	db, err := sql.Open("postgres", psqlInfo)
@@ -72,7 +28,7 @@ func readOrderHandler(c *gin.Context) {
 	//Close postgres connection before exiting function
 	defer db.Close()
 
-	var invoice Order
+	var invoice model.Order
 	var row *sql.Row
 
 	//Fetching parameter value passed as id
@@ -85,18 +41,18 @@ func readOrderHandler(c *gin.Context) {
 
 	if err != nil {
 		log.Println(err)
-		c.JSON(500, "Row does not exist")
+		c.JSON(http.StatusInternalServerError, constant.ErrorRowNotExist)
 		return
 	}
 
 	//Output order row data
-	c.JSON(200, invoice)
+	c.JSON(http.StatusOK, invoice)
 
 }
 
 //This function creates a new order in orders table and orderitems table
 
-func createOrderHandler(c *gin.Context) {
+func CreateOrderHandler(c *gin.Context) {
 
 	// Create postgres connection
 	db, err := sql.Open("postgres", psqlInfo)
@@ -110,7 +66,7 @@ func createOrderHandler(c *gin.Context) {
 	// Getting data from POST request body
 	decoder := json.NewDecoder(c.Request.Body)
 
-	var one Order
+	var one model.Order
 
 	err = decoder.Decode(&one)
 	if err != nil {
@@ -123,7 +79,7 @@ func createOrderHandler(c *gin.Context) {
 	err = db.QueryRow("SELECT count(*) FROM orderitems WHERE id=$1", one.Items.Id).Scan(&count)
 	if err != nil {
 		log.Println(err)
-		c.JSON(500, "Error checking orderitems table!")
+		c.JSON(http.StatusInternalServerError, constant.ErrorCheckOrderItems)
 		return
 	}
 	fmt.Println(count)
@@ -133,7 +89,7 @@ func createOrderHandler(c *gin.Context) {
 		_, err = db.Exec("INSERT INTO orderitems(id, description, price, quantity) VALUES ($1, $2, $3, $4)", one.Items.Id, one.Items.Desc, one.Items.Price, one.Items.Qty)
 		if err != nil {
 			log.Println(err)
-			c.JSON(500, "Error adding to orderitems table!")
+			c.JSON(http.StatusInternalServerError, constant.ErrorAddToOrderItems)
 			return
 		}
 	}
@@ -142,17 +98,17 @@ func createOrderHandler(c *gin.Context) {
 	_, err = db.Exec("INSERT INTO orders(id, status, item_id, total, currency_unit) VALUES ($1, $2, $3, $4, $5)", one.Id, one.Status, one.Items.Id, one.Total, one.CurrencyUnit)
 	if err != nil {
 		log.Println(err)
-		c.JSON(500, "Error adding to orders table!")
+		c.JSON(http.StatusInternalServerError, constant.ErrorAddToOrders)
 		return
 	}
 
 	// Output row ID
-	c.JSON(200, fmt.Sprintf("Added = %v", one.Id))
+	c.JSON(http.StatusOK, fmt.Sprintf("Added = %v", one.Id))
 }
 
 //This function fetches orders from the orders table and sorts them based on the column name provided and ascending/descending order
 
-func sortOrderHandler(c *gin.Context) {
+func SortOrderHandler(c *gin.Context) {
 
 	//Create postgres connection
 	db, err := sql.Open("postgres", psqlInfo)
@@ -181,7 +137,7 @@ func sortOrderHandler(c *gin.Context) {
 	err = decoder.Decode(&one)
 	if err != nil {
 		log.Println(err)
-		c.JSON(500, "Rows do not exist!!!!")
+		c.JSON(http.StatusInternalServerError, constant.ErrorRowNotExist)
 		return
 	}
 
@@ -205,20 +161,20 @@ func sortOrderHandler(c *gin.Context) {
 	rows, err := db.Query(query)
 	if err != nil {
 		log.Println(err)
-		c.JSON(500, "Rows do not exist!")
+		c.JSON(http.StatusInternalServerError, constant.ErrorRowNotExist)
 		return
 	}
-	var orders []Order
+	var orders []model.Order
 
 	for rows.Next() {
-		var order Order
+		var order model.Order
 
 		//Check error in row
 		err := rows.Scan(&order.Id, &order.Status, &order.Items.Id, &order.Items.Desc, &order.Items.Price, &order.Items.Qty, &order.Total, &order.CurrencyUnit)
 
 		if err != nil {
 			log.Println(err)
-			c.JSON(500, "Rows do not exist!!")
+			c.JSON(http.StatusInternalServerError, constant.ErrorRowNotExist)
 			return
 		}
 
@@ -226,13 +182,13 @@ func sortOrderHandler(c *gin.Context) {
 	}
 
 	//Output sorted rows
-	c.JSON(200, orders)
+	c.JSON(http.StatusOK, orders)
 
 }
 
 //This function updates the status of the order based on id value present in orders table
 
-func updateOrderHandler(c *gin.Context) {
+func UpdateOrderHandler(c *gin.Context) {
 
 	//Create postgres connection
 	db, err := sql.Open("postgres", psqlInfo)
@@ -264,18 +220,18 @@ func updateOrderHandler(c *gin.Context) {
 
 	if err != nil {
 		log.Println(err)
-		c.JSON(500, gin.H{"error": "Error in updation in table!"})
+		c.JSON(http.StatusInternalServerError, constant.ErrorUpdating)
 		return
 	}
 
 	//Output row ID
-	c.JSON(200, gin.H{"message": fmt.Sprintf("Updated = %v", one.Id)})
+	c.JSON(http.StatusOK, gin.H{"message": fmt.Sprintf("Updated = %v", one.Id)})
 
 }
 
 //This function deletes an order based on id value present in orders table
 
-func deleteOrderHandler(c *gin.Context) {
+func DeleteOrderHandler(c *gin.Context) {
 
 	//Create postgres connection
 	db, err := sql.Open("postgres", psqlInfo)
@@ -293,10 +249,10 @@ func deleteOrderHandler(c *gin.Context) {
 	_, err = db.Exec("Delete from orders where id = $1", deleteId)
 	if err != nil {
 		log.Println(err)
-		c.JSON(500, gin.H{"message": "Error in deletion from table!"})
+		c.JSON(http.StatusInternalServerError, constant.ErrorDeleting)
 		return
 	}
 
 	//Output row ID
-	c.JSON(200, gin.H{"message": fmt.Sprintf("Deleted = %v", deleteId)})
+	c.JSON(http.StatusOK, gin.H{"message": fmt.Sprintf("Deleted = %v", deleteId)})
 }

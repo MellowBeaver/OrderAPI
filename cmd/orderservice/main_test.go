@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"orderapp/pkg/handler"
 	"strings"
 	"testing"
 
@@ -27,7 +28,7 @@ func TestCreateOrderHandler(t *testing.T) {
 
 	// Create a new gin router with the sortOrderHandler as the endpoint
 	r := gin.New()
-	r.POST("/create", createOrderHandler)
+	r.POST("/create", handler.CreateOrderHandler)
 
 	// Set up the test request payload
 	order := map[string]interface{}{
@@ -57,7 +58,7 @@ func TestCreateOrderHandler(t *testing.T) {
 	// Set up the test context and call the handler function
 	c, _ := gin.CreateTestContext(w)
 	c.Request = req
-	createOrderHandler(c)
+	handler.CreateOrderHandler(c)
 
 	// Verify the response status code and body
 	assert.Equal(t, http.StatusOK, w.Code)
@@ -75,7 +76,7 @@ func TestReadOrderHandler(t *testing.T) {
 
 	// Create a new router instance
 	r := gin.New()
-	r.GET("/read/:id", readOrderHandler)
+	r.GET("/read/:id", handler.ReadOrderHandler)
 
 	// Serve the HTTP request to the recorder
 	r.ServeHTTP(rr, req)
@@ -96,7 +97,7 @@ func TestUpdateOrderHandler(t *testing.T) {
 	// Set up test router and handler
 	r := gin.Default()
 
-	r.PUT("/orders/:id", updateOrderHandler)
+	r.PUT("/orders/:id", handler.UpdateOrderHandler)
 
 	// Mock request payload
 	payload := `{
@@ -151,15 +152,15 @@ func TestUpdateOrderHandler(t *testing.T) {
 		t.Fatalf("Failed to query database: %v", err)
 	}
 
-	if status != "COMPLETED" {
-		t.Errorf("Row was not updated in database: got %v, want COMPLETED", status)
+	if status != "DONE" {
+		t.Errorf("Row was not updated in database: got %v, want DONE", status)
 	}
 }
 
 func TestDeleteOrderHandler(t *testing.T) {
 	// Setup test router
 	r := gin.Default()
-	r.DELETE("/orders/:id", deleteOrderHandler)
+	r.DELETE("/orders/:id", handler.DeleteOrderHandler)
 
 	// Create test request
 	req, err := http.NewRequest("DELETE", "/orders/abcdef-123456", nil)
@@ -171,10 +172,11 @@ func TestDeleteOrderHandler(t *testing.T) {
 	rr := httptest.NewRecorder()
 
 	// Create a mock database connection and inject it into the context
-	db, err := sql.Open("postgres", psqlInfo)
+	db, err := MockDB()
 	if err != nil {
-		t.Fatalf("Failed to create database connection: %v", err)
+		t.Fatalf("Failed to connect to mock database: %v", err)
 	}
+
 	defer db.Close()
 	ctx := gin.Context{}
 	ctx.Set("db", db)
