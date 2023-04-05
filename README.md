@@ -2,6 +2,8 @@
 
 This is a simple API to demonstrate CRUD operations along with sort and filter functionality on a database.
 
+Test cases are covered for Create, Read, Update and Delete functions and not Sort/Filter function.
+
 # Usecases
 
 This API has 6 use cases:
@@ -249,3 +251,7 @@ create table orders (
 
 - First download dependencies, run `go get ./...`
 - Finally run `go run main.go`
+
+## Steps to run the test file
+
+- Run `go test -run main_test.go`

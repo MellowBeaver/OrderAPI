@@ -16,17 +16,7 @@ var psqlInfo string = fmt.Sprintf("host=%s port=%d user=%s "+"password=%s dbname
 
 //This function fetches data based on id value present in orders table
 
-func ReadOrderHandler(c *gin.Context) {
-
-	//Create postgres connection
-	db, err := sql.Open("postgres", psqlInfo)
-	fmt.Print("CONNECT")
-	if err != nil {
-		log.Println(err)
-	}
-
-	//Close postgres connection before exiting function
-	defer db.Close()
+func ReadOrderHandler(c *gin.Context, db *sql.DB) {
 
 	var invoice model.Order
 	var row *sql.Row
@@ -37,7 +27,7 @@ func ReadOrderHandler(c *gin.Context) {
 	row = db.QueryRow("select o.id, o.status, oi.id, oi.description, oi.price, oi.quantity, o.total, o.currency_unit from orders o, orderitems oi where o.item_id = oi.id and o.id=$1", id)
 
 	//Check error in row
-	err = row.Scan(&invoice.Id, &invoice.Status, &invoice.Items.Id, &invoice.Items.Desc, &invoice.Items.Price, &invoice.Items.Qty, &invoice.Total, &invoice.CurrencyUnit)
+	err := row.Scan(&invoice.Id, &invoice.Status, &invoice.Items.Id, &invoice.Items.Desc, &invoice.Items.Price, &invoice.Items.Qty, &invoice.Total, &invoice.CurrencyUnit)
 
 	if err != nil {
 		log.Println(err)
@@ -52,23 +42,14 @@ func ReadOrderHandler(c *gin.Context) {
 
 //This function creates a new order in orders table and orderitems table
 
-func CreateOrderHandler(c *gin.Context) {
-
-	// Create postgres connection
-	db, err := sql.Open("postgres", psqlInfo)
-	if err != nil {
-		log.Println(err)
-	}
-
-	// Close postgres connection before exiting function
-	defer db.Close()
+func CreateOrderHandler(c *gin.Context, db *sql.DB) {
 
 	// Getting data from POST request body
 	decoder := json.NewDecoder(c.Request.Body)
 
 	var one model.Order
 
-	err = decoder.Decode(&one)
+	err := decoder.Decode(&one)
 	if err != nil {
 		log.Println(err)
 		return
@@ -108,17 +89,7 @@ func CreateOrderHandler(c *gin.Context) {
 
 //This function fetches orders from the orders table and sorts them based on the column name provided and ascending/descending order
 
-func SortOrderHandler(c *gin.Context) {
-
-	//Create postgres connection
-	db, err := sql.Open("postgres", psqlInfo)
-	fmt.Print("CONNECT")
-	if err != nil {
-		log.Println(err)
-	}
-
-	//Close postgres connection before exiting function
-	defer db.Close()
+func SortOrderHandler(c *gin.Context, db *sql.DB) {
 
 	// Getting data from POST request body
 	decoder := json.NewDecoder(c.Request.Body)
@@ -134,7 +105,7 @@ func SortOrderHandler(c *gin.Context) {
 	var query string
 
 	//Getting condition, column name and order from JSON body
-	err = decoder.Decode(&one)
+	err := decoder.Decode(&one)
 	if err != nil {
 		log.Println(err)
 		c.JSON(http.StatusInternalServerError, constant.ErrorRowNotExist)
@@ -188,16 +159,7 @@ func SortOrderHandler(c *gin.Context) {
 
 //This function updates the status of the order based on id value present in orders table
 
-func UpdateOrderHandler(c *gin.Context) {
-
-	//Create postgres connection
-	db, err := sql.Open("postgres", psqlInfo)
-	if err != nil {
-		log.Println(err)
-	}
-
-	//Close postgres connection before exiting function
-	defer db.Close()
+func UpdateOrderHandler(c *gin.Context, db *sql.DB) {
 
 	// Getting data from PUT request body
 	decoder := json.NewDecoder(c.Request.Body)
@@ -209,7 +171,7 @@ func UpdateOrderHandler(c *gin.Context) {
 
 	var one UpdateStatus
 
-	err = decoder.Decode(&one)
+	err := decoder.Decode(&one)
 	if err != nil {
 		log.Println(err)
 		return
@@ -231,19 +193,12 @@ func UpdateOrderHandler(c *gin.Context) {
 
 //This function deletes an order based on id value present in orders table
 
-func DeleteOrderHandler(c *gin.Context) {
-
-	//Create postgres connection
-	db, err := sql.Open("postgres", psqlInfo)
-	if err != nil {
-		log.Println(err)
-	}
-
-	//Close postgres connection before exiting function
-	defer db.Close()
+func DeleteOrderHandler(c *gin.Context, db *sql.DB) {
 
 	//Fetching parameter value passed as id
 	deleteId := c.Params.ByName("id")
+
+	var err error
 
 	//Delete row
 	_, err = db.Exec("Delete from orders where id = $1", deleteId)

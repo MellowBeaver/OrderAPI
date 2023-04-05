@@ -28,7 +28,9 @@ func TestCreateOrderHandler(t *testing.T) {
 
 	// Create a new gin router with the sortOrderHandler as the endpoint
 	r := gin.New()
-	r.POST("/create", handler.CreateOrderHandler)
+	r.POST("/create", func(c *gin.Context) {
+		handler.CreateOrderHandler(c, db)
+	})
 
 	// Set up the test request payload
 	order := map[string]interface{}{
@@ -58,7 +60,7 @@ func TestCreateOrderHandler(t *testing.T) {
 	// Set up the test context and call the handler function
 	c, _ := gin.CreateTestContext(w)
 	c.Request = req
-	handler.CreateOrderHandler(c)
+	handler.CreateOrderHandler(c, db)
 
 	// Verify the response status code and body
 	assert.Equal(t, http.StatusOK, w.Code)
@@ -74,9 +76,19 @@ func TestReadOrderHandler(t *testing.T) {
 	// Create a new recorder to record the HTTP response
 	rr := httptest.NewRecorder()
 
+	// Get a mock database connection for testing
+	db, err := MockDB()
+	if err != nil {
+		t.Fatalf("Failed to connect to mock database: %v", err)
+	}
+
+	defer db.Close()
+
 	// Create a new router instance
 	r := gin.New()
-	r.GET("/read/:id", handler.ReadOrderHandler)
+	r.GET("/read/:id", func(c *gin.Context) {
+		handler.ReadOrderHandler(c, db)
+	})
 
 	// Serve the HTTP request to the recorder
 	r.ServeHTTP(rr, req)
@@ -97,7 +109,17 @@ func TestUpdateOrderHandler(t *testing.T) {
 	// Set up test router and handler
 	r := gin.Default()
 
-	r.PUT("/orders/:id", handler.UpdateOrderHandler)
+	// Get a mock database connection for testing
+	db, err := MockDB()
+	if err != nil {
+		t.Fatalf("Failed to connect to mock database: %v", err)
+	}
+
+	defer db.Close()
+
+	r.PUT("/orders/:id", func(c *gin.Context) {
+		handler.UpdateOrderHandler(c, db)
+	})
 
 	// Mock request payload
 	payload := `{
@@ -116,14 +138,6 @@ func TestUpdateOrderHandler(t *testing.T) {
 
 	// Create a mock response recorder
 	rr := httptest.NewRecorder()
-
-	// Get a mock database connection for testing
-	db, err := MockDB()
-	if err != nil {
-		t.Fatalf("Failed to connect to mock database: %v", err)
-	}
-
-	defer db.Close()
 
 	// Bind the database connection to the context
 	r.Use(func(c *gin.Context) {
@@ -160,7 +174,18 @@ func TestUpdateOrderHandler(t *testing.T) {
 func TestDeleteOrderHandler(t *testing.T) {
 	// Setup test router
 	r := gin.Default()
-	r.DELETE("/orders/:id", handler.DeleteOrderHandler)
+
+	// Get a mock database connection for testing
+	db, err := MockDB()
+	if err != nil {
+		t.Fatalf("Failed to connect to mock database: %v", err)
+	}
+
+	defer db.Close()
+
+	r.DELETE("/orders/:id", func(c *gin.Context) {
+		handler.DeleteOrderHandler(c, db)
+	})
 
 	// Create test request
 	req, err := http.NewRequest("DELETE", "/orders/abcdef-123456", nil)
@@ -170,16 +195,6 @@ func TestDeleteOrderHandler(t *testing.T) {
 
 	// Create a response recorder to record the response
 	rr := httptest.NewRecorder()
-
-	// Create a mock database connection and inject it into the context
-	db, err := MockDB()
-	if err != nil {
-		t.Fatalf("Failed to connect to mock database: %v", err)
-	}
-
-	defer db.Close()
-	ctx := gin.Context{}
-	ctx.Set("db", db)
 
 	// Call the deleteOrderHandler function and record the response
 	r.ServeHTTP(rr, req)
